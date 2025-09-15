@@ -50,8 +50,21 @@ app.use('*', (req, res) => {
 });
 
 // Initialize database connection
-sequelize.authenticate()
-  .then(() => console.log('Database connected'))
-  .catch(err => console.error('Database connection failed:', err));
+let dbConnected = false;
+const initDB = async () => {
+  if (!dbConnected) {
+    try {
+      await sequelize.authenticate();
+      console.log('Database connected');
+      dbConnected = true;
+    } catch (err) {
+      console.error('Database connection failed:', err);
+    }
+  }
+};
 
-module.exports = app;
+// Vercel serverless function handler
+module.exports = async (req, res) => {
+  await initDB();
+  return app(req, res);
+};
