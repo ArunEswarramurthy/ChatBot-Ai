@@ -3,7 +3,7 @@ const cors = require('cors');
 const passport = require('./config/passport');
 require('dotenv').config();
 
-const sequelize = require('./config/db');
+const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
 // Import routes
@@ -16,7 +16,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3004',
+  origin: ['http://localhost:3000', 'http://localhost:3004', process.env.FRONTEND_URL].filter(Boolean),
   credentials: true
 }));
 
@@ -49,21 +49,32 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-const PORT = process.env.PORT || 5000;
+// Dynamic port allocation
+function startApp(port) {
+  const server = app.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} occupied. Trying ${port + 1}...`);
+      startApp(port + 1);
+    } else {
+      console.error('❌ Server error:', err.message);
+      process.exit(1);
+    }
+  });
+}
 
 // Database connection and server start
 const startServer = async () => {
   try {
-    await sequelize.authenticate();
-    console.log('Database connected successfully');
+    await connectDB();
     
-    // await sequelize.sync({ alter: true });
-    console.log('Database synchronized');
-    
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV}`);
-    });
+    const initialPort = parseInt(process.env.PORT, 10) || 5000;
+    startApp(initialPort);
   } catch (error) {
     console.error('Unable to start server:', error);
     process.exit(1);

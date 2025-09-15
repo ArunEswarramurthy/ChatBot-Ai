@@ -59,7 +59,7 @@ A complete full-stack AI Chatbot SaaS application with premium subscription mode
 
 ### Backend
 - **Node.js + Express**: RESTful API server
-- **MySQL + Sequelize**: Database with ORM
+- **MongoDB + Mongoose**: Database with ODM
 - **JWT + Passport**: Authentication system
 - **Stripe**: Payment processing
 - **Multiple AI APIs**: OpenAI, Google Gemini, Groq, etc.
@@ -93,35 +93,36 @@ A complete full-stack AI Chatbot SaaS application with premium subscription mode
 
 ### Prerequisites
 - Node.js 18+
-- MySQL 8.0+
+- MongoDB 6.0+ (or MongoDB Atlas)
 - Stripe Account
 - AI API Keys (Gemini, Groq, etc.)
 
-### Backend Setup
+### Quick Start (Windows)
 
+```bash
+# Clone the repository
+git clone <repository-url>
+cd "version 4 - Copy"
+
+# Run both servers at once
+start-dev.bat
+```
+
+### Manual Setup
+
+#### Backend Setup
 ```bash
 cd backend
 npm install
-
-# Configure environment variables
 cp .env.example .env
 # Edit .env with your credentials
-
-# Database setup
-npx sequelize db:create
-npx sequelize db:migrate
-
-# Start server
 npm run dev
 ```
 
-### Frontend Setup
-
+#### Frontend Setup
 ```bash
 cd frontend
 npm install
-
-# Start development server
 npm run dev
 ```
 
@@ -132,11 +133,10 @@ npm run dev
 PORT=5000
 NODE_ENV=development
 
-# Database
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=ai_chatbot_saas
+# MongoDB Database
+MONGODB_URI=mongodb://localhost:27017/ai_chatbot_saas
+# OR for MongoDB Atlas:
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ai_chatbot_saas
 
 # JWT
 JWT_SECRET=your-super-secret-jwt-key
@@ -158,13 +158,38 @@ GROQ_API_KEY=your-groq-api-key
 FRONTEND_URL=http://localhost:3000
 ```
 
+## 📁 Project Structure
+
+```
+version 4 - Copy/
+├── backend/                 # Node.js API server
+│   ├── config/              # Database & Passport config
+│   ├── controllers/         # Route handlers
+│   ├── middleware/          # Auth & error handling
+│   ├── models/              # Sequelize models
+│   ├── routes/              # API routes
+│   ├── .env.example         # Environment template
+│   ├── package.json         # Dependencies
+│   └── server.js            # Main server file
+├── frontend/               # React application
+│   ├── src/
+│   │   ├── components/      # Reusable components
+│   │   ├── context/         # React context
+│   │   ├── pages/           # Route components
+│   │   └── utils/           # Helper functions
+│   ├── .env.example         # Environment template
+│   └── package.json         # Dependencies
+├── start-dev.bat           # Windows dev script
+└── README.md               # Documentation
+```
+
 ## 🔧 Configuration
 
 ### Database Schema
-The application uses three main models:
+The application uses three main MongoDB collections:
 - **Users**: Authentication, subscription info
-- **Chats**: Conversation containers
-- **Messages**: Individual chat messages
+- **Chats**: Conversation containers with user references
+- **Messages**: Individual chat messages with chat references
 
 ### AI Model Configuration
 Supported AI providers:
@@ -267,9 +292,9 @@ Comprehensive analytics with:
 ## 🚀 Deployment
 
 ### Backend Deployment
-1. Set up MySQL database
+1. Set up MongoDB database (local or MongoDB Atlas)
 2. Configure environment variables
-3. Run database migrations
+3. Run database setup: `npm run setup`
 4. Deploy to your preferred platform (Heroku, AWS, etc.)
 
 ### Frontend Deployment

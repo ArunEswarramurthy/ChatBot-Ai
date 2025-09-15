@@ -27,30 +27,31 @@ const ProfileModal = ({ isOpen, onClose, user }) => {
     e.preventDefault();
     setLoading(true);
 
-    const updateData = { name: formData.name };
-    
-    if (formData.newPassword) {
-      if (formData.newPassword !== formData.confirmPassword) {
-        toast.error('Passwords do not match');
-        setLoading(false);
-        return;
+    try {
+      const updateData = { name: formData.name };
+      
+      if (formData.newPassword) {
+        if (formData.newPassword !== formData.confirmPassword) {
+          toast.error('Passwords do not match');
+          return;
+        }
+        updateData.currentPassword = formData.currentPassword;
+        updateData.newPassword = formData.newPassword;
       }
-      updateData.currentPassword = formData.currentPassword;
-      updateData.newPassword = formData.newPassword;
-    }
 
-    const result = await updateProfile(updateData);
-    
-    if (result.success) {
-      setFormData({
-        ...formData,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
+      const result = await updateProfile(updateData);
+      
+      if (result.success) {
+        setFormData({
+          ...formData,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const handleDeleteAccount = async (e) => {
@@ -61,13 +62,16 @@ const ProfileModal = ({ isOpen, onClose, user }) => {
     }
 
     setLoading(true);
-    const result = await deleteAccount(deletePassword);
     
-    if (result.success) {
-      onClose();
+    try {
+      const result = await deleteAccount(deletePassword);
+      
+      if (result.success) {
+        onClose();
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (

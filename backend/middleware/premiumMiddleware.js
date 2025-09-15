@@ -6,7 +6,7 @@ const checkChatLimit = async (req, res, next) => {
       return next();
     }
 
-    const chatCount = await Chat.count({ where: { userId: req.user.id } });
+    const chatCount = await Chat.countDocuments({ userId: req.user._id });
     
     if (chatCount >= 20) {
       return res.status(403).json({ 
@@ -29,8 +29,8 @@ const checkMessageLimit = async (req, res, next) => {
       return next();
     }
 
-    const messageCount = await Message.count({ 
-      where: { chatId: req.params.id || req.params.chatId } 
+    const messageCount = await Message.countDocuments({ 
+      chatId: req.params.id || req.params.chatId 
     });
     
     if (messageCount >= 20) {

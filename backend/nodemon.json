@@ -1,0 +1,4 @@
+{
+  "ignore": ["node_modules", "*.log", "*.txt", "*.md"],
+  "delay": 1000
+}

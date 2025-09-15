@@ -4,18 +4,21 @@ const { User } = require('../models');
 const createCheckoutSession = async (req, res) => {
   try {
     // For demo purposes, simulate upgrade without Stripe
-    const user = await User.findByPk(req.user.id);
-    await user.update({
-      role: 'premium',
-      subscriptionStart: new Date(),
-      subscriptionEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-    });
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        role: 'premium',
+        subscriptionStart: new Date(),
+        subscriptionEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      },
+      { new: true }
+    );
 
     res.json({ 
       message: 'Demo upgrade successful',
       url: `${process.env.FRONTEND_URL}/stripe/success`,
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -42,17 +45,20 @@ const handleSuccess = async (req, res) => {
     if (session.payment_status === 'paid') {
       const subscription = await stripe.subscriptions.retrieve(session.subscription);
       
-      const user = await User.findByPk(req.user.id);
-      await user.update({
-        role: 'premium',
-        subscriptionStart: new Date(subscription.current_period_start * 1000),
-        subscriptionEnd: new Date(subscription.current_period_end * 1000)
-      });
+      const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+          role: 'premium',
+          subscriptionStart: new Date(subscription.current_period_start * 1000),
+          subscriptionEnd: new Date(subscription.current_period_end * 1000)
+        },
+        { new: true }
+      );
 
       res.json({ 
         message: 'Subscription activated successfully',
         user: {
-          id: user.id,
+          id: user._id,
           name: user.name,
           email: user.email,
           role: user.role,
@@ -92,15 +98,15 @@ const webhook = async (req, res) => {
         const customer = await stripe.customers.retrieve(subscription.customer);
         
         if (customer.metadata.userId) {
-          const user = await User.findByPk(customer.metadata.userId);
-          if (user) {
-            const isActive = subscription.status === 'active';
-            await user.update({
+          const isActive = subscription.status === 'active';
+          await User.findByIdAndUpdate(
+            customer.metadata.userId,
+            {
               role: isActive ? 'premium' : 'free',
               subscriptionStart: isActive ? new Date(subscription.current_period_start * 1000) : null,
               subscriptionEnd: isActive ? new Date(subscription.current_period_end * 1000) : null
-            });
-          }
+            }
+          );
         }
         break;
     }

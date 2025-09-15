@@ -5,7 +5,7 @@ const createChat = async (req, res) => {
     const { title } = req.body;
     
     const chat = await Chat.create({
-      userId: req.user.id,
+      userId: req.user._id,
       title: title || 'New Chat'
     });
 
@@ -17,15 +17,17 @@ const createChat = async (req, res) => {
 
 const getChats = async (req, res) => {
   try {
-    const chats = await Chat.findAll({
-      where: { userId: req.user.id },
-      order: [['updatedAt', 'DESC']],
-      include: [{
-        model: Message,
-        limit: 1,
-        order: [['createdAt', 'DESC']]
-      }]
-    });
+    const chats = await Chat.find({ userId: req.user._id })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Get latest message for each chat
+    for (let chat of chats) {
+      const latestMessage = await Message.findOne({ chatId: chat._id })
+        .sort({ createdAt: -1 })
+        .lean();
+      chat.Messages = latestMessage ? [latestMessage] : [];
+    }
 
     res.json(chats);
   } catch (error) {
@@ -36,17 +38,19 @@ const getChats = async (req, res) => {
 const getChat = async (req, res) => {
   try {
     const chat = await Chat.findOne({
-      where: { id: req.params.id, userId: req.user.id },
-      include: [{
-        model: Message,
-        order: [['createdAt', 'ASC']]
-      }]
-    });
+      _id: req.params.id,
+      userId: req.user._id
+    }).lean();
 
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
+    const messages = await Message.find({ chatId: chat._id })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    chat.Messages = messages;
     res.json(chat);
   } catch (error) {
     res.status(500).json({ error: 'Server error fetching chat' });
@@ -56,14 +60,16 @@ const getChat = async (req, res) => {
 const deleteChat = async (req, res) => {
   try {
     const chat = await Chat.findOne({
-      where: { id: req.params.id, userId: req.user.id }
+      _id: req.params.id,
+      userId: req.user._id
     });
 
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
-    await chat.destroy();
+    await Message.deleteMany({ chatId: chat._id });
+    await Chat.findByIdAndDelete(chat._id);
     res.json({ message: 'Chat deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Server error deleting chat' });
@@ -74,16 +80,18 @@ const exportChat = async (req, res) => {
   try {
     const { format = 'text' } = req.query;
     const chat = await Chat.findOne({
-      where: { id: req.params.id, userId: req.user.id },
-      include: [{
-        model: Message,
-        order: [['createdAt', 'ASC']]
-      }]
-    });
+      _id: req.params.id,
+      userId: req.user._id
+    }).lean();
 
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
+
+    const messages = await Message.find({ chatId: chat._id })
+      .sort({ createdAt: 1 })
+      .lean();
+    chat.Messages = messages;
 
     const cleanTitle = chat.title.replace(/[^a-zA-Z0-9]/g, '-');
 

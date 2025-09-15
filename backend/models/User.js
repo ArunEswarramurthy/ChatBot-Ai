@@ -1,73 +1,67 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const User = sequelize.define('User', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const userSchema = new mongoose.Schema({
   name: {
-    type: DataTypes.STRING,
-    allowNull: false
+    type: String,
+    required: true
   },
   email: {
-    type: DataTypes.STRING,
-    allowNull: false,
+    type: String,
+    required: true,
     unique: true,
-    validate: {
-      isEmail: true
-    }
+    lowercase: true
   },
   password: {
-    type: DataTypes.STRING,
-    allowNull: true
+    type: String,
+    required: false
   },
   provider: {
-    type: DataTypes.ENUM('local', 'google'),
-    defaultValue: 'local'
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   role: {
-    type: DataTypes.ENUM('free', 'premium', 'admin'),
-    defaultValue: 'free'
+    type: String,
+    enum: ['free', 'premium', 'admin'],
+    default: 'free'
   },
   subscriptionStart: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date,
+    default: null
   },
   subscriptionEnd: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date,
+    default: null
   },
   stripeCustomerId: {
-    type: DataTypes.STRING,
-    allowNull: true
+    type: String,
+    default: null
   }
 }, {
-  hooks: {
-    beforeCreate: async (user) => {
-      if (user.password) {
-        user.password = await bcrypt.hash(user.password, 12);
-      }
-    },
-    beforeUpdate: async (user) => {
-      if (user.changed('password') && user.password) {
-        user.password = await bcrypt.hash(user.password, 12);
-      }
-    }
+  timestamps: true
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password') || !this.password) return next();
+  
+  try {
+    this.password = await bcrypt.hash(this.password, 12);
+    next();
+  } catch (error) {
+    next(error);
   }
 });
 
-User.prototype.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function(candidatePassword) {
   if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-User.prototype.isPremium = function() {
+userSchema.methods.isPremium = function() {
   return this.role === 'premium' && 
          this.subscriptionEnd && 
          new Date() < new Date(this.subscriptionEnd);
 };
 
-module.exports = User;
+module.exports = mongoose.model('User', userSchema);

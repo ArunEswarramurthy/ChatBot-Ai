@@ -12,12 +12,14 @@ const UpgradePopup = ({ isOpen, onClose, limitType, limit, current }) => {
     setLoading(true);
     try {
       const response = await api.post('/stripe/create-session');
-      toast.success('Account upgraded to Premium!');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      if (response.data.url) {
+        window.location.href = response.data.url;
+      } else {
+        toast.error('Failed to create checkout session');
+      }
     } catch (error) {
       toast.error('Failed to upgrade account');
+    } finally {
       setLoading(false);
     }
   };

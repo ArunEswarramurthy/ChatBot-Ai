@@ -7,12 +7,7 @@ const AI_MODELS = {
     apiKey: process.env.GEMINI_API_KEY,
     endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent'
   },
-  'llama-3.1-8b': {
-    provider: 'groq',
-    apiKey: process.env.GROQ_API_KEY,
-    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama3-8b-8192'
-  },
+
   'deepseek-chat': {
     provider: 'openrouter',
     apiKey: process.env.DEEPSEEK_API_KEY,
@@ -30,7 +25,13 @@ const AI_MODELS = {
     apiKey: process.env.GEMINI_2_5_PRO_API_KEY,
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
     model: 'google/gemini-pro-1.5'
-  }
+  },
+  'llama3-70b-8192': {
+    provider: 'groq',
+    apiKey: process.env.GROQ_API_KEY,
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama3-70b-8192'
+  },
 };
 
 const callAI = async (model, messages, userMessage) => {
@@ -90,7 +91,8 @@ const sendMessage = async (req, res) => {
 
     // Verify chat belongs to user
     const chat = await Chat.findOne({
-      where: { id: chatId, userId: req.user.id }
+      _id: chatId,
+      userId: req.user._id
     });
 
     if (!chat) {
@@ -106,11 +108,10 @@ const sendMessage = async (req, res) => {
     });
 
     // Get chat history for context
-    const messages = await Message.findAll({
-      where: { chatId },
-      order: [['createdAt', 'ASC']],
-      limit: 20 // Limit context to last 20 messages
-    });
+    const messages = await Message.find({ chatId })
+      .sort({ createdAt: 1 })
+      .limit(20)
+      .lean();
 
     // Get AI response
     const aiResponse = await callAI(model, messages, text);
@@ -127,13 +128,13 @@ const sendMessage = async (req, res) => {
     const userMessages = messages.filter(msg => msg.sender === 'user');
     if (userMessages.length === 1) {
       const title = text.length > 50 ? text.substring(0, 50) + '...' : text;
-      await chat.update({ title });
+      await Chat.findByIdAndUpdate(chat._id, { title });
     }
 
     res.json({
       userMessage,
       aiMessage,
-      chat: await Chat.findByPk(chatId)
+      chat: await Chat.findById(chatId)
     });
   } catch (error) {
     console.error('Send message error:', error);

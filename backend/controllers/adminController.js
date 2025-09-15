@@ -1,21 +1,20 @@
 const { User, Chat, Message } = require('../models');
-const { Op } = require('sequelize');
-const sequelize = require('../config/db');
 
 const getUserStats = async (req, res) => {
   try {
-    const stats = await User.findAll({
-      attributes: [
-        'role',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      group: ['role']
-    });
+    const stats = await User.aggregate([
+      {
+        $group: {
+          _id: '$role',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
 
-    const formattedStats = stats.reduce((acc, stat) => {
-      acc[stat.role] = parseInt(stat.dataValues.count);
-      return acc;
-    }, { free: 0, premium: 0, admin: 0 });
+    const formattedStats = { free: 0, premium: 0, admin: 0 };
+    stats.forEach(stat => {
+      formattedStats[stat._id] = stat.count;
+    });
 
     res.json(formattedStats);
   } catch (error) {
@@ -25,29 +24,38 @@ const getUserStats = async (req, res) => {
 
 const getChatStats = async (req, res) => {
   try {
-    const totalChats = await Chat.count();
-    const totalMessages = await Message.count();
+    const totalChats = await Chat.countDocuments();
+    const totalMessages = await Message.countDocuments();
     
-    const dailyStats = await Chat.findAll({
-      attributes: [
-        [sequelize.fn('DATE', sequelize.col('createdAt')), 'date'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'chats']
-      ],
-      where: {
-        createdAt: {
-          [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dailyStats = await Chat.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo }
         }
       },
-      group: [sequelize.fn('DATE', sequelize.col('createdAt'))],
-      order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']]
-    });
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt'
+            }
+          },
+          chats: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
 
     res.json({
       totalChats,
       totalMessages,
       dailyStats: dailyStats.map(stat => ({
-        date: stat.dataValues.date,
-        chats: parseInt(stat.dataValues.chats)
+        date: stat._id,
+        chats: stat.chats
       }))
     });
   } catch (error) {
@@ -57,21 +65,24 @@ const getChatStats = async (req, res) => {
 
 const getModelStats = async (req, res) => {
   try {
-    const stats = await Message.findAll({
-      attributes: [
-        'model',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      where: {
-        sender: 'ai',
-        model: { [Op.not]: null }
+    const stats = await Message.aggregate([
+      {
+        $match: {
+          sender: 'ai',
+          model: { $ne: null }
+        }
       },
-      group: ['model']
-    });
+      {
+        $group: {
+          _id: '$model',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
 
     const formattedStats = stats.map(stat => ({
-      model: stat.model || 'Unknown',
-      count: parseInt(stat.dataValues.count)
+      model: stat._id || 'Unknown',
+      count: stat.count
     }));
 
     res.json(formattedStats);
@@ -82,7 +93,7 @@ const getModelStats = async (req, res) => {
 
 const getRevenue = async (req, res) => {
   try {
-    const premiumUsers = await User.count({ where: { role: 'premium' } });
+    const premiumUsers = await User.countDocuments({ role: 'premium' });
     const monthlyRevenue = premiumUsers * 9.99; // $9.99 per user
     
     // Mock revenue data for the last 12 months
@@ -113,17 +124,17 @@ const getUsers = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    const users = await User.findAndCountAll({
-      attributes: ['id', 'name', 'email', 'role', 'provider', 'createdAt', 'subscriptionEnd'],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      order: [['createdAt', 'DESC']]
-    });
+    const totalUsers = await User.countDocuments();
+    const users = await User.find({}, 'name email role provider createdAt subscriptionEnd')
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({
-      users: users.rows,
-      totalUsers: users.count,
-      totalPages: Math.ceil(users.count / limit),
+      users,
+      totalUsers,
+      totalPages: Math.ceil(totalUsers / limit),
       currentPage: parseInt(page)
     });
   } catch (error) {
@@ -140,16 +151,19 @@ const updateUserRole = async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    const user = await User.findByPk(userId);
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        role,
+        subscriptionStart: role === 'premium' ? new Date() : null,
+        subscriptionEnd: role === 'premium' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
+      },
+      { new: true }
+    );
+    
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    await user.update({ 
-      role,
-      subscriptionStart: role === 'premium' ? new Date() : null,
-      subscriptionEnd: role === 'premium' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null
-    });
 
     res.json({ message: 'User role updated successfully', user });
   } catch (error) {
@@ -161,12 +175,10 @@ const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
     
-    const user = await User.findByPk(userId);
+    const user = await User.findByIdAndDelete(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    await user.destroy();
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Server error deleting user' });

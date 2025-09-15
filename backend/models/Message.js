@@ -1,32 +1,26 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const mongoose = require('mongoose');
 
-const Message = sequelize.define('Message', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const messageSchema = new mongoose.Schema({
   chatId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    references: {
-      model: 'Chats',
-      key: 'id'
-    }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chat',
+    required: true
   },
   sender: {
-    type: DataTypes.ENUM('user', 'ai'),
-    allowNull: false
+    type: String,
+    enum: ['user', 'ai'],
+    required: true
   },
   model: {
-    type: DataTypes.STRING,
-    allowNull: true
+    type: String,
+    default: null
   },
   text: {
-    type: DataTypes.TEXT,
-    allowNull: false
+    type: String,
+    required: true
   }
+}, {
+  timestamps: true
 });
 
-module.exports = Message;
+module.exports = mongoose.model('Message', messageSchema);

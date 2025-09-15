@@ -14,18 +14,18 @@ const signup = async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    const existingUser = await User.findOne({ where: { email } });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
     const user = await User.create({ name, email, password });
-    const token = generateToken(user.id);
+    const token = generateToken(user._id);
 
     res.status(201).json({
       token,
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -45,17 +45,17 @@ const login = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = generateToken(user.id);
+    const token = generateToken(user._id);
 
     res.json({
       token,
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -71,7 +71,7 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   res.json({
     user: {
-      id: req.user.id,
+      id: req.user._id,
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
@@ -107,7 +107,7 @@ const updateProfile = async (req, res) => {
 
     res.json({
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -129,7 +129,7 @@ const deleteAccount = async (req, res) => {
       return res.status(401).json({ error: 'Password is incorrect' });
     }
 
-    await user.destroy();
+    await User.findByIdAndDelete(user._id);
     res.json({ message: 'Account deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Server error deleting account' });
@@ -140,7 +140,7 @@ const googleAuth = passport.authenticate('google', { scope: ['profile', 'email']
 
 const googleCallback = async (req, res) => {
   try {
-    const token = generateToken(req.user.id);
+    const token = generateToken(req.user._id);
     res.redirect(`${process.env.FRONTEND_URL}/auth/success?token=${token}`);
   } catch (error) {
     res.redirect(`${process.env.FRONTEND_URL}/auth/error`);

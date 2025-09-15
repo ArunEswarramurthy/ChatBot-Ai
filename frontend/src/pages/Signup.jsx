@@ -41,13 +41,15 @@ const Signup = () => {
     
     setLoading(true);
     
-    const result = await signup(formData.name, formData.email, formData.password);
-    
-    if (result.success) {
-      navigate('/dashboard');
+    try {
+      const result = await signup(formData.name, formData.email, formData.password);
+      
+      if (result.success) {
+        navigate('/dashboard');
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const handleGoogleSignup = () => {
