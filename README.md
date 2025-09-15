@@ -1,6 +1,6 @@
-# AI Chatbot SaaS Platform
+# AI Chatbot
 
-A complete full-stack AI Chatbot SaaS application with premium subscription model, multiple AI providers, modern UI, and comprehensive user management features.
+A complete full-stack AI Chatbot application with premium subscription model, multiple AI providers, modern UI, and comprehensive user management features.
 
 ## ✨ New Features Added
 
